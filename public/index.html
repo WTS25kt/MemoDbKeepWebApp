@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MemoDbKeep_CodeBlock</title>
+    <style>
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        .left {
+            width: 33.33%;
+            border-right: 1px solid #000;
+            box-sizing: border-box;
+            padding: 10px;
+            cursor: pointer; /* クリック可能にするためのスタイル */
+        }
+        .right {
+            width: 66.67%;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .error {
+            color: red;
+        }
+        pre code {
+            display: block;
+            padding: 1em;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+    <!-- highlight.jsの読み込み -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.0/highlight.min.js"></script>
+</head>
+<body>
+    <form id="textForm">
+        <div class="text-area-small">
+            <textarea id="textarea1" rows="3" cols="30"></textarea>
+            <div id="errorText1" class="error"></div>
+        </div>
+        <div class="text-area-large">
+            <textarea id="textarea2" rows="15" cols="30"></textarea>
+            <div id="errorText2" class="error"></div>
+        </div>
+        <button type="button" id="saveButton" class="save-button">保存</button>
+    </form>
+
+    <div class="container">
+        <div class="left" id="leftContainer">
+            <!-- 左側のセル（リストとして追加されるテキストエリア1の文字列が入る） -->
+        </div>
+        <div class="right" id="rightContainer">
+            <!-- 右側のエリア（テキストエリア1にマッピングするテキストエリア2を表示） -->
+        </div>
+    </div>
+
+    <!-- marked.jsの読み込み -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script>
+        // marked.jsのオプションを設定
+        marked.setOptions({
+            breaks: true,  // 改行を自動的に処理する
+            highlight: function(code, lang) {
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                return hljs.highlight(code, { language }).value;
+            }
+        });
+
+        document.getElementById('saveButton').addEventListener('click', function() {
+            var text1 = document.getElementById('textarea1').value;
+            var text2 = document.getElementById('textarea2').value;
+            var isValid = true;
+
+            // エラーメッセージのクリア
+            document.getElementById('errorText1').textContent = '';
+            document.getElementById('errorText2').textContent = '';
+
+            // テキストエリア1の入力チェック
+            if (!text1 || text1.trim().length === 0) {
+                document.getElementById('errorText1').textContent = 'テキストエリア1は空であってはなりません。';
+                isValid = false;
+            }
+
+            // テキストエリア2の入力チェック
+            if (!text2 || text2.trim().length === 0) {
+                document.getElementById('errorText2').textContent = 'テキストエリア2は空であってはなりません。';
+                isValid = false;
+            }
+
+            // 入力が有効な場合のみサーバーに送信
+            if (isValid) {
+                // データをサーバーに送信
+                fetch('/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text1: text1, text2: text2 })
+                }).then(response => {
+                    if (response.ok) {
+                        alert('データが保存されました');
+                        loadData();  // データを再読み込み
+                    } else {
+                        alert('データの保存に失敗しました');
+                    }
+                });
+            }
+        });
+
+        // データを取得して表示する関数
+        function loadData() {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    const leftContainer = document.getElementById('leftContainer');
+                    const rightContainer = document.getElementById('rightContainer');
+
+                    leftContainer.innerHTML = '';  // 既存の内容をクリア
+                    rightContainer.innerHTML = '';  // 既存の内容をクリア
+
+                    data.forEach(item => {
+                        const leftItem = document.createElement('p');
+                        leftItem.textContent = item.text1;
+                        leftItem.dataset.text2 = item.text2;  // text2をデータ属性として保存
+                        leftContainer.appendChild(leftItem);
+                    });
+                });
+        }
+
+        // leftContainer内のクリックイベントを委譲
+        document.getElementById('leftContainer').addEventListener('click', function(event) {
+            if (event.target.tagName === 'P') {
+                const text2 = event.target.dataset.text2;
+                const rightContainer = document.getElementById('rightContainer');
+                rightContainer.innerHTML = '';  // 既存の内容をクリア
+                const rightItem = document.createElement('div');
+                rightItem.innerHTML = marked.parse(text2);  // marked.jsを使用してマークダウンをHTMLに変換
+                rightContainer.appendChild(rightItem);
+            }
+        });
+
+        // ページ読み込み時にデータを読み込む
+        window.onload = loadData;
+    </script>
+</body>
+</html>
